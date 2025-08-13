@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Branqly – Connecting Brands with India’s Top Influencers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The SPA uses a top-down narrative flow designed for a potential client's journey. It starts with a strong value proposition (Hero), explains what Branqly does (Services), provides compelling evidence of their network (Interactive Influencer Explorer), shows proof of results (Success Stories & Testimonials), and introduces an AI-powered tool for a campaign brief (AI Tools). It ends with a clear call to action (Contact). The core of the app is the 'Influencer Explorer', which moves from static lists to an interactive dashboard. This structure is chosen because it allows users to quickly grasp the value, then dive deep into the most critical data (the influencer network) with interactive tools, making the experience more engaging and persuasive than a linear document. The entire layout is built with responsive Tailwind classes to ensure optimal viewing on all device sizes. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Company Overview -> Goal: Inform -> Viz/Method: Hero section with key text -> Interaction: Delayed CSS fade-in animation on page load -> Justification: Creates an impactful first impression. The layout uses responsive font sizes and padding.
+        - Report Info: Services List -> Goal: Inform -> Viz/Method: Icon-based cards (HTML/CSS) -> Interaction: Scroll-triggered fade-up animation -> Justification: The grid layout dynamically adjusts from a single column on mobile to five on desktop, making the content scannable on all screens.
+        - Report Info: Influencer Lists -> Goal: Organize/Compare -> Viz/Method: Filterable grid of cards (HTML/JS) + Dynamic Horizontal Bar Chart (Chart.js/Canvas) -> Interaction: User clicks a niche button, which filters the grid and updates the chart. The card rendering is animated with a short fade-in. -> Justification: The grid layout adapts responsively. The chart container has a controlled height and width to prevent overflow on smaller screens.
+        - Report Info: Gemini API Integration -> Goal: Assist & Engage -> Viz/Method: Interactive form and a display area for generated text -> Interaction: User inputs data and clicks a button to generate a campaign brief or a tailored pitch using the Gemini API. A loading animation is shown during the API call. -> Justification: The form and output sections are contained within a flexible layout that resizes gracefully.
+        - Report Info: Success Stories -> Goal: Persuade -> Viz/Method: High-impact stat cards (HTML/CSS) -> Interaction: Scroll-triggered fade-up animation -> Justification: The two-column layout on desktop collapses to a single column on mobile for easy reading.
+        - Report Info: Testimonials -> Goal: Persuade -> Viz/Method: Blockquote cards (HTML/CSS) -> Interaction: Scroll-triggered fade-up animation -> Justification: Presented in a responsive layout that adapts to screen size.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F5F4;
+            color: #292524;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 400px;
+            max-height: 50vh;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 500px;
+            }
+        }
+        .nav-link {
+            transition: color 0.3s;
+        }
+        .nav-link:hover {
+            color: #F97316;
+        }
+        .cta-button {
+            transition: background-color 0.3s, transform 0.3s;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .filter-button {
+            transition: all 0.3s;
+        }
+        .filter-button.active {
+            background-color: #F97316;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .influencer-card {
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .influencer-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            position: relative;
+        }
+        .close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: #78716C;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #F97316;
+            border-radius: 50%;
+            width: 2rem;
+            height: 2rem;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animated-section, .animated-element {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+        .animated-element-in-view, .animated-section-in-view {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .animate-hero-title {
+            animation: fadeIn 1s ease-out forwards;
+            animation-delay: 0.2s;
+        }
+        .animate-hero-text {
+            animation: fadeIn 1s ease-out forwards;
+            animation-delay: 0.4s;
+        }
+        .animate-hero-cta {
+            animation: fadeIn 1s ease-out forwards;
+            animation-delay: 0.6s;
+        }
+        .influencer-card-animate {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="#" class="text-2xl font-bold text-stone-800">Branqly.</a>
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#services" class="text-stone-600 nav-link">Services</a>
+                <a href="#influencers" class="text-stone-600 nav-link">Influencers</a>
+                <a href="#ai-tools" class="text-stone-600 nav-link">AI Tools</a>
+                <a href="#results" class="text-stone-600 nav-link">Results</a>
+                <a href="#contact" class="bg-orange-500 text-white font-medium py-2 px-4 rounded-lg cta-button">Contact Us</a>
+            </div>
+            <div class="md:hidden">
+                <a href="#contact" class="bg-orange-500 text-white font-medium py-2 px-4 rounded-lg cta-button">Contact</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section id="hero" class="py-20 md:py-32 bg-white">
+            <div class="container mx-auto px-6 text-center">
+                <h1 class="text-4xl md:text-6xl font-bold text-stone-900 leading-tight animate-hero-title opacity-0">Connecting Brands with India’s Top Influencers.</h1>
+                <p class="mt-6 text-lg md:text-xl text-stone-600 max-w-3xl mx-auto animate-hero-text opacity-0">At Branqly, we specialize in connecting Indian brands with the right influencers to drive growth, engagement, and sales. We ensure you partner with creators whose audience perfectly matches your target customers.</p>
+                <a href="#influencers" class="mt-8 inline-block bg-orange-500 text-white font-bold py-3 px-8 rounded-lg text-lg cta-button animate-hero-cta opacity-0">Explore Our Network</a>
+            </div>
+        </section>
+
+        <section id="services" class="py-16 md:py-24 animated-section">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-bold text-stone-900">Our Comprehensive Services</h2>
+                    <p class="mt-4 text-lg text-stone-600 max-w-2xl mx-auto">This section outlines the core services we provide. From initial strategy to final analytics, we offer a complete solution to help your brand succeed in the competitive world of influencer marketing.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 text-center">
+                    <div class="bg-white p-6 rounded-xl shadow-md animated-element">
+                        <div class="text-4xl text-orange-500 mb-4">🎯</div>
+                        <h3 class="text-xl font-semibold mb-2">Influencer Campaigns</h3>
+                        <p class="text-stone-600">End-to-end planning, execution, and performance tracking for maximum impact.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md animated-element" style="transition-delay: 0.1s;">
+                        <div class="text-4xl text-orange-500 mb-4">🤝</div>
+                        <h3 class="text-xl font-semibold mb-2">Creator Partnerships</h3>
+                        <p class="text-stone-600">Facilitating authentic, long-term collaborations that build audience trust.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md animated-element" style="transition-delay: 0.2s;">
+                        <div class="text-4xl text-orange-500 mb-4">📈</div>
+                        <h3 class="text-xl font-semibold mb-2">Social Media Strategy</h3>
+                        <p class="text-stone-600">Developing content strategies that align with promotions for maximum ROI.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md animated-element" style="transition-delay: 0.3s;">
+                        <div class="text-4xl text-orange-500 mb-4">🎬</div>
+                        <h3 class="text-xl font-semibold mb-2">Content Creation</h3>
+                        <p class="text-stone-600">Assisting creators with scriptwriting and editing for high-quality content.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md animated-element" style="transition-delay: 0.4s;">
+                        <div class="text-4xl text-orange-500 mb-4">📊</div>
+                        <h3 class="text-xl font-semibold mb-2">Analytics & Reporting</h3>
+                        <p class="text-stone-600">Providing detailed reports to measure the direct impact on your business.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="influencers" class="py-16 md:py-24 bg-white animated-section">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-bold text-stone-900">Explore Our Influencer Network</h2>
+                    <p class="mt-4 text-lg text-stone-600 max-w-3xl mx-auto">This is the core of our application, where you can explore a sample of our vast influencer network. Use the filters to select a niche. The grid will display top influencers in that category, and the chart below will dynamically update to visualize their follower reach, helping you compare their audience size at a glance.</p>
+                </div>
+
+                <div id="niche-filters" class="flex flex-wrap justify-center gap-2 md:gap-4 mb-12">
+                </div>
+
+                <div id="influencer-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-16">
+                </div>
+
+                <div class="text-center mb-12">
+                    <h3 class="text-2xl md:text-3xl font-bold text-stone-900">Follower Reach Comparison</h3>
+                    <p class="mt-2 text-md text-stone-600">Chart automatically updates based on your selected niche.</p>
+                </div>
+                <div class="chart-container">
+                    <canvas id="influencerChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section id="ai-tools" class="py-16 md:py-24 animated-section">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-bold text-stone-900">AI-Powered Campaign Tools</h2>
+                    <p class="mt-4 text-lg text-stone-600 max-w-2xl mx-auto">This section features our AI-driven tools, powered by the Gemini API, to help you jumpstart your influencer marketing strategy. Simply provide some details about your brand, and our AI will generate a tailored campaign brief for you to use.</p>
+                </div>
+                <div class="bg-white p-8 rounded-xl shadow-lg max-w-4xl mx-auto animated-element">
+                    <h3 class="text-2xl font-semibold mb-4 text-stone-800">Generate a Campaign Brief ✨</h3>
+                    <p class="text-stone-600 mb-6">Fill in the details below and get a detailed campaign brief generated instantly.</p>
+                    <form id="campaign-form" class="space-y-4">
+                        <div>
+                            <label for="brand-name" class="block text-sm font-medium text-stone-700">Brand Name</label>
+                            <input type="text" id="brand-name" name="brandName" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-orange-500 focus:ring focus:ring-orange-200 focus:ring-opacity-50 px-3 py-2" placeholder="e.g., UrbanStyle">
+                        </div>
+                        <div>
+                            <label for="product" class="block text-sm font-medium text-stone-700">Product/Service</label>
+                            <input type="text" id="product" name="product" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-orange-500 focus:ring focus:ring-orange-200 focus:ring-ring-opacity-50 px-3 py-2" placeholder="e.g., A new clothing line for young adults">
+                        </div>
+                        <div>
+                            <label for="target-audience" class="block text-sm font-medium text-stone-700">Target Audience</label>
+                            <input type="text" id="target-audience" name="targetAudience" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-orange-500 focus:ring focus:ring-orange-200 focus:ring-opacity-50 px-3 py-2" placeholder="e.g., Gen Z, ages 18-24, fashion-conscious">
+                        </div>
+                        <div>
+                            <label for="campaign-goal" class="block text-sm font-medium text-stone-700">Campaign Goal</label>
+                            <input type="text" id="campaign-goal" name="campaignGoal" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-orange-500 focus:ring focus:ring-orange-200 focus:ring-opacity-50 px-3 py-2" placeholder="e.g., Increase brand awareness and drive sales for the new collection">
+                        </div>
+                        <button type="submit" id="generate-brief-btn" class="w-full bg-orange-500 text-white font-bold py-2 px-4 rounded-lg cta-button">
+                            ✨ Generate Campaign Brief
+                        </button>
+                    </form>
+                    <div id="brief-output" class="mt-8 p-6 bg-stone-50 rounded-xl shadow-inner text-stone-800 hidden">
+                        <div id="brief-loading" class="flex justify-center items-center h-24 hidden">
+                            <div class="loader"></div>
+                        </div>
+                        <h4 class="font-bold mb-2 hidden" id="brief-title">Generated Brief:</h4>
+                        <div id="brief-content" class="whitespace-pre-wrap"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="results" class="py-16 md:py-24 animated-section">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-bold text-stone-900">Proven Results & Testimonials</h2>
+                    <p class="mt-4 text-lg text-stone-600 max-w-2xl mx-auto">In this section, we showcase the tangible impact of our collaborations through real-world success stories and client feedback. See how we've helped brands achieve significant growth and hear directly from our satisfied partners.</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                    <div>
+                        <h3 class="text-2xl font-semibold mb-6 text-center lg:text-left animated-element">Success Stories</h3>
+                        <div class="space-y-6">
+                            <div class="bg-white p-6 rounded-xl shadow-lg animated-element">
+                                <p class="text-orange-500 font-bold text-sm">FASHION BRAND LAUNCH</p>
+                                <p class="text-3xl font-bold text-stone-800 my-2">350% Increase</p>
+                                <p class="text-stone-600">in online sales within 30 days for a Mumbai-based clothing label after collaborating with Komal Pandey.</p>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-lg animated-element" style="transition-delay: 0.1s;">
+                                <p class="text-orange-500 font-bold text-sm">FITNESS PRODUCT GROWTH</p>
+                                <p class="text-3xl font-bold text-stone-800 my-2">₹50 Lakh+ Revenue</p>
+                                <p class="text-stone-600">generated from Instagram promotions alone after a protein brand partnered with Sahil Khan and Yatinder Singh.</p>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-lg animated-element" style="transition-delay: 0.2s;">
+                                <p class="text-orange-500 font-bold text-sm">TECH PRODUCT LAUNCH</p>
+                                <p class="text-3xl font-bold text-stone-800 my-2">5,000 Units Sold Out</p>
+                                <p class="text-stone-600">in 48 hours for a startup smartphone company that teamed up with Tech Burner and Trakin Tech.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-semibold mb-6 text-center lg:text-left animated-element">What Our Clients Say</h3>
+                        <div class="space-y-6">
+                            <div class="bg-white p-6 rounded-xl shadow-lg animated-element">
+                                <p class="text-stone-600 italic">"Working with Branqly was the best decision for our brand’s social media growth."</p>
+                                <p class="mt-4 font-bold text-right text-stone-800">– Rohit Mehra, CEO of UrbanStyle</p>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-lg animated-element" style="transition-delay: 0.1s;">
+                                <p class="text-stone-600 italic">"Their influencer connections are unmatched. Our skincare range went viral in just two weeks."</p>
+                                <p class="mt-4 font-bold text-right text-stone-800">– Priya Desai, Founder of GlowEssence</p>
+                            </div>
+                             <div class="bg-white p-6 rounded-xl shadow-lg animated-element" style="transition-delay: 0.2s;">
+                                <p class="text-stone-600 italic">"They don’t just find influencers, they find the right influencers for your brand."</p>
+                                <p class="mt-4 font-bold text-right text-stone-800">– Amit Khanna, Marketing Head at FreshBites</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="contact" class="py-16 md:py-24 bg-stone-800 text-white animated-section">
+            <div class="container mx-auto px-6 text-center">
+                <h2 class="text-3xl md:text-4xl font-bold">Ready to Grow Your Brand?</h2>
+                <p class="mt-4 text-lg text-stone-300 max-w-2xl mx-auto">Let's connect and discuss how we can create a powerful influencer marketing strategy tailored to your business goals.</p>
+                <div class="mt-8">
+                    <a href="mailto:branqly.0@gmail.com" class="inline-block bg-orange-500 text-white font-bold py-3 px-8 rounded-lg text-lg cta-button">
+                        📧 Contact Us: branqly.0@gmail.com
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-stone-900 text-stone-400 py-6">
+        <div class="container mx-auto px-6 text-center text-sm">
+            <p>© 2024 Branqly. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <div id="pitch-modal" class="modal">
+        <div class="modal-content max-w-2xl">
+            <span class="close-button" id="close-modal">×</span>
+            <h3 class="text-2xl font-bold text-stone-900 mb-4">Tailored Pitch for <span id="pitch-influencer-name"></span> ✨</h3>
+            <form id="pitch-form" class="space-y-4">
+                <div>
+                    <label for="pitch-brand-name" class="block text-sm font-medium text-stone-700">Your Brand Name</label>
+                    <input type="text" id="pitch-brand-name" name="brandName" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm px-3 py-2" placeholder="e.g., UrbanStyle">
+                </div>
+                <div>
+                    <label for="pitch-product" class="block text-sm font-medium text-stone-700">Your Product/Service</label>
+                    <textarea id="pitch-product" name="product" rows="3" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm px-3 py-2" placeholder="e.g., Our new sustainable clothing line 'EcoWear'"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-orange-500 text-white font-bold py-2 px-4 rounded-lg cta-button">
+                    ✨ Generate Pitch
+                </button>
+            </form>
+            <div id="pitch-output" class="mt-8 p-6 bg-stone-50 rounded-xl shadow-inner text-stone-800 hidden">
+                <div id="pitch-loading" class="flex justify-center items-center h-24 hidden">
+                    <div class="loader"></div>
+                </div>
+                <div id="pitch-content" class="whitespace-pre-wrap"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const __app_id = "default-app-id";
+    const __firebase_config = "{}";
+
+document.addEventListener('DOMContentLoaded', () => {
+    const influencerData = [
+        { name: 'Komal Pandey', handle: '', niche: 'Fashion & Lifestyle', followers: 2.0, followerText: '2M+', platform: 'Instagram' },
+        { name: 'Kritika Khurana', handle: 'ThatBohoGirl', niche: 'Fashion & Lifestyle', followers: 1.8, followerText: '1.8M+', platform: 'Instagram' },
+        { name: 'Kusha Kapila', handle: '', niche: 'Fashion & Lifestyle', followers: 3.0, followerText: '3M+', platform: 'Instagram / YouTube' },
+        { name: 'Masoom Minawala', handle: '', niche: 'Fashion & Lifestyle', followers: 1.4, followerText: '1.4M+', platform: 'Instagram' },
+        { name: 'Aashna Shroff', handle: '', niche: 'Fashion & Lifestyle', followers: 1.0, followerText: '1M+', platform: 'Instagram' },
+        { name: 'Roshni Bhatia', handle: '', niche: 'Fashion & Lifestyle', followers: 0.8, followerText: '800K+', platform: 'Instagram' },
+        { name: 'Juhi Godambe', handle: '', niche: 'Fashion & Lifestyle', followers: 0.7, followerText: '700K+', platform: 'Instagram' },
+        { name: 'Santoshi Shetty', handle: '', niche: 'Fashion & Lifestyle', followers: 0.6, followerText: '600K+', platform: 'Instagram' },
+        { name: 'Sejal Kumar', handle: '', niche: 'Fashion & Lifestyle', followers: 1.5, followerText: '1.5M+', platform: 'YouTube / Instagram' },
+        { name: 'Aakriti Rana', handle: '', niche: 'Fashion & Lifestyle', followers: 0.9, followerText: '900K+', platform: 'Instagram' },
+
+        { name: 'Ranveer Allahbadia', handle: 'BeerBiceps', niche: 'Fitness', followers: 6.0, followerText: '6M+', platform: 'YouTube' },
+        { name: 'Sahil Khan', handle: '', niche: 'Fitness', followers: 10.0, followerText: '10M+', platform: 'Instagram' },
+        { name: 'Guru Mann', handle: '', niche: 'Fitness', followers: 2.5, followerText: '2.5M+', platform: 'YouTube' },
+        { name: 'Yatinder Singh', handle: '', niche: 'Fitness', followers: 2.0, followerText: '2M+', platform: 'Instagram' },
+        { name: 'Abhinav Mahajan', handle: '', niche: 'Fitness', followers: 1.5, followerText: '1.5M+', platform: 'YouTube / Instagram' },
+        { name: 'Tarun Gill', handle: '', niche: 'Fitness', followers: 1.0, followerText: '1M+', platform: 'YouTube' },
+        { name: 'Ankita Singh', handle: '', niche: 'Fitness', followers: 0.5, followerText: '500K+', platform: 'Instagram' },
+        { name: 'Neha Singh', handle: '', niche: 'Fitness', followers: 0.4, followerText: '400K+', platform: 'Instagram' },
+        { name: 'Swetha Devraj', handle: '', niche: 'Fitness', followers: 0.3, followerText: '300K+', platform: 'Instagram' },
+        { name: 'Sonali Swami', handle: '', niche: 'Fitness', followers: 0.25, followerText: '250K+', platform: 'Instagram' },
+
+        { name: 'Technical Guruji', handle: '', niche: 'Tech', followers: 23.0, followerText: '23M+', platform: 'YouTube' },
+        { name: 'Tech Burner', handle: '', niche: 'Tech', followers: 12.0, followerText: '12M+', platform: 'YouTube' },
+        { name: 'Trakin Tech', handle: '', niche: 'Tech', followers: 14.0, followerText: '14M+', platform: 'YouTube' },
+        { name: 'Geeky Ranjit', handle: '', niche: 'Tech', followers: 3.0, followerText: '3M+', platform: 'YouTube' },
+        { name: 'Sharmaji Technical', handle: '', niche: 'Tech', followers: 2.0, followerText: '2M+', platform: 'YouTube' },
+        { name: 'Techno Ruhez', handle: '', niche: 'Tech', followers: 3.5, followerText: '3.5M+', platform: 'YouTube' },
+        { name: 'Gyan Therapy', handle: '', niche: 'Tech', followers: 3.2, followerText: '3.2M+', platform: 'YouTube' },
+        { name: 'Mr. Phone', handle: '', niche: 'Tech', followers: 1.5, followerText: '1.5M+', platform: 'YouTube' },
+        { name: 'Beebom', handle: '', niche: 'Tech', followers: 3.0, followerText: '3M+', platform: 'YouTube' },
+        { name: 'Tech Unboxing', handle: '', niche: 'Tech', followers: 1.0, followerText: '1M+', platform: 'YouTube' },
+
+        { name: 'Malvika Sitlani', handle: '', niche: 'Beauty & Skincare', followers: 0.8, followerText: '800K+', platform: 'YouTube / Instagram' },
+        { name: 'Shreya Jain', handle: '', niche: 'Beauty & Skincare', followers: 0.7, followerText: '700K+', platform: 'YouTube / Instagram' },
+        { name: 'Jovita George', handle: '', niche: 'Beauty & Skincare', followers: 0.6, followerText: '600K+', platform: 'YouTube' },
+        { name: 'Aishwarya Kaushal', handle: '', niche: 'Beauty & Skincare', followers: 0.5, followerText: '500K+', platform: 'Instagram' },
+        { name: 'Ankita Chaturvedi', handle: '', niche: 'Beauty & Skincare', followers: 0.4, followerText: '400K+', platform: 'YouTube' },
+        { name: 'Shaurya Sanadhya', handle: '', niche: 'Beauty & Skincare', followers: 1.0, followerText: '1M+', platform: 'Instagram' },
+        { name: 'Mridul Sharma', handle: '', niche: 'Beauty & Skincare', followers: 2.0, followerText: '2M+', platform: 'YouTube' },
+        { name: 'Parul Gulati', handle: '', niche: 'Beauty & Skincare', followers: 1.5, followerText: '1.5M+', platform: 'Instagram / YouTube' },
+        { name: 'Roshni Walia', handle: '', niche: 'Beauty & Skincare', followers: 1.0, followerText: '1M+', platform: 'Instagram' },
+        { name: 'Arshia Moorjani', handle: '', niche: 'Beauty & Skincare', followers: 0.7, followerText: '700K+', platform: 'Instagram' },
+
+        { name: 'Kunal Kapur', handle: '', niche: 'Food', followers: 2.0, followerText: '2M+', platform: 'YouTube / Instagram' },
+        { name: 'Kabita’s Kitchen', handle: '', niche: 'Food', followers: 13.0, followerText: '13M+', platform: 'YouTube' },
+        { name: 'Nisha Madhulika', handle: '', niche: 'Food', followers: 14.0, followerText: '14M+', platform: 'YouTube' },
+        { name: 'Chef Ranveer Brar', handle: '', niche: 'Food', followers: 5.0, followerText: '5M+', platform: 'Instagram / YouTube' },
+        { name: 'Your Food Lab', handle: '', niche: 'Food', followers: 3.0, followerText: '3M+', platform: 'Instagram / YouTube' },
+        { name: 'Delhi Food Walks', handle: '', niche: 'Food', followers: 1.5, followerText: '1.5M+', platform: 'YouTube' },
+        { name: 'CookingShooking', handle: '', niche: 'Food', followers: 4.0, followerText: '4M+', platform: 'YouTube' },
+        { name: 'Piyush Goenka', handle: '', niche: 'Food', followers: 0.8, followerText: '800K+', platform: 'Instagram' },
+        { name: 'The Foodie Baba', handle: '', niche: 'Food', followers: 0.6, followerText: '600K+', platform: 'Instagram' },
+        { name: 'EatTreat', handle: '', niche: 'Food', followers: 0.7, followerText: '700K+', platform: 'Instagram' },
+
+        { name: 'Bhuvan Bam', handle: '', niche: 'Comedy & Entertainment', followers: 26.0, followerText: '26M+', platform: 'YouTube' },
+        { name: 'Ashish Chanchlani', handle: '', niche: 'Comedy & Entertainment', followers: 30.0, followerText: '30M+', platform: 'YouTube' },
+        { name: 'CarryMinati', handle: '', niche: 'Comedy & Entertainment', followers: 43.0, followerText: '43M+', platform: 'YouTube' },
+        { name: 'Zakir Khan', handle: '', niche: 'Comedy & Entertainment', followers: 8.0, followerText: '8M+', platform: 'YouTube / Instagram' },
+        { name: 'Harsh Beniwal', handle: '', niche: 'Comedy & Entertainment', followers: 15.0, followerText: '15M+', platform: 'YouTube' },
+        { name: 'Anubhav Singh Bassi', handle: '', niche: 'Comedy & Entertainment', followers: 6.0, followerText: '6M+', platform: 'YouTube / Instagram' },
+        { name: 'Saloni Gaur', handle: 'Nazma Aapi', niche: 'Comedy & Entertainment', followers: 1.5, followerText: '1.5M+', platform: 'Instagram' },
+        { name: 'Dolly Singh', handle: '', niche: 'Comedy & Entertainment', followers: 1.0, followerText: '1M+', platform: 'Instagram' },
+        { name: 'BeYouNick', handle: '', niche: 'Comedy & Entertainment', followers: 1.5, followerText: '1.5M+', platform: 'YouTube / Instagram' },
+        { name: 'Prajakta Koli', handle: 'MostlySane', niche: 'Comedy & Entertainment', followers: 7.0, followerText: '7M+', platform: 'YouTube' },
+
+        { name: 'Ankur Warikoo', handle: '', niche: 'Finance & Education', followers: 6.0, followerText: '6M+', platform: 'Instagram / YouTube' },
+        { name: 'Rachana Ranade', handle: '', niche: 'Finance & Education', followers: 5.0, followerText: '5M+', platform: 'YouTube' },
+        { name: 'Pranjal Kamra', handle: '', niche: 'Finance & Education', followers: 6.0, followerText: '6M+', platform: 'YouTube' },
+        { name: 'Neha Nagar', handle: '', niche: 'Finance & Education', followers: 2.0, followerText: '2M+', platform: 'Instagram' },
+        { name: 'Sharan Hegde', handle: 'Finance with Sharan', niche: 'Finance & Education', followers: 3.0, followerText: '3M+', platform: 'Instagram' },
+        { name: 'CA Rachana Phadke', handle: '', niche: 'Finance & Education', followers: 4.0, followerText: '4M+', platform: 'YouTube / Instagram' },
+        { name: 'Shreya Pattar', handle: '', niche: 'Finance & Education', followers: 0.7, followerText: '700K+', platform: 'Instagram / LinkedIn' },
+        { name: 'Akshat Shrivastava', handle: '', niche: 'Finance & Education', followers: 2.0, followerText: '2M+', platform: 'YouTube / Instagram' },
+        { name: 'Nidhi Nagori', handle: '', niche: 'Finance & Education', followers: 0.8, followerText: '800K+', platform: 'Instagram' },
+        { name: 'Fintalks with Anmol', handle: '', niche: 'Finance & Education', followers: 0.7, followerText: '700K+', platform: 'Instagram / YouTube' },
+    ];
+
+    const grid = document.getElementById('influencer-grid');
+    const filtersContainer = document.getElementById('niche-filters');
+    const chartCtx = document.getElementById('influencerChart').getContext('2d');
+    const briefForm = document.getElementById('campaign-form');
+    const briefOutput = document.getElementById('brief-output');
+    const briefContent = document.getElementById('brief-content');
+    const briefLoading = document.getElementById('brief-loading');
+    const briefTitle = document.getElementById('brief-title');
+    const pitchModal = document.getElementById('pitch-modal');
+    const pitchForm = document.getElementById('pitch-form');
+    const pitchOutput = document.getElementById('pitch-output');
+    const pitchInfluencerName = document.getElementById('pitch-influencer-name');
+    const pitchLoading = pitchOutput.querySelector('#pitch-loading');
+    const closeModalBtn = document.getElementById('close-modal');
+    
+    let currentInfluencerName = '';
+    let chart;
+
+    const niches = ['All', ...new Set(influencerData.map(i => i.niche))];
+    let currentNiche = 'All';
+
+    async function makeGeminiApiCall(prompt) {
+        let chatHistory = [];
+        chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+        const payload = { contents: chatHistory };
+        const apiKey = ""
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        let retries = 3;
+        while (retries > 0) {
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    return result.candidates[0].content.parts[0].text;
+                }
+            } catch (error) {
+                retries--;
+                if (retries > 0) {
+                    const delay = Math.pow(2, 3 - retries) * 1000;
+                    await new Promise(res => setTimeout(res, delay));
+                }
+            }
+        }
+        throw new Error("Failed to get a response from the Gemini API after multiple retries.");
+    }
+
+    function renderFilters() {
+        filtersContainer.innerHTML = niches.map(niche => `
+            <button class="filter-button px-4 py-2 rounded-full text-sm font-semibold border-2 border-stone-200 bg-white text-stone-700 ${niche === currentNiche ? 'active' : ''}" data-niche="${niche}">
+                ${niche}
+            </button>
+        `).join('');
+
+        document.querySelectorAll('.filter-button').forEach(button => {
+            button.addEventListener('click', () => {
+                currentNiche = button.dataset.niche;
+                renderFilters();
+                renderInfluencers();
+                updateChart();
+            });
+        });
+    }
+
+    function renderInfluencers() {
+        const filteredData = currentNiche === 'All'
+            ? influencerData
+            : influencerData.filter(i => i.niche === currentNiche);
+
+        grid.innerHTML = filteredData.map((influencer, index) => `
+            <div class="influencer-card bg-white rounded-xl shadow-md p-4 flex flex-col text-center items-center influencer-card-animate" style="animation-delay: ${index * 0.05}s;">
+                <div class="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center mb-3 font-bold text-orange-500 text-2xl">
+                    ${influencer.name.charAt(0)}
+                </div>
+                <h4 class="font-bold text-stone-800">${influencer.name}</h4>
+                ${influencer.handle ? `<p class="text-xs text-stone-500">(${influencer.handle})</p>` : ''}
+                <p class="text-sm text-stone-500 mt-1">${influencer.platform}</p>
+                <div class="mt-3 bg-stone-100 text-stone-800 font-bold text-sm py-1 px-3 rounded-full">
+                    ${influencer.followerText}
+                </div>
+                <button class="generate-pitch-btn mt-4 w-full bg-orange-100 text-orange-600 font-bold py-2 px-4 rounded-lg text-sm transition hover:bg-orange-200" data-influencer="${influencer.name}">
+                    ✨ Get a Tailored Pitch
+                </button>
+            </div>
+        `).join('');
+
+        document.querySelectorAll('.generate-pitch-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                currentInfluencerName = e.target.dataset.influencer;
+                pitchInfluencerName.textContent = currentInfluencerName;
+                pitchOutput.classList.add('hidden');
+                pitchModal.style.display = 'flex';
+                document.body.classList.add('overflow-hidden');
+            });
+        });
+    }
+    
+    function updateChart() {
+        const filteredData = (currentNiche === 'All' 
+            ? influencerData.sort((a, b) => b.followers - a.followers).slice(0, 10)
+            : influencerData.filter(i => i.niche === currentNiche).sort((a, b) => b.followers - a.followers)
+        );
+
+        const labels = filteredData.map(i => i.name.length > 16 ? i.name.substring(0, 15) + '...' : i.name);
+        const data = filteredData.map(i => i.followers);
+
+        if (chart) {
+            chart.destroy();
+        }
+
+        chart = new Chart(chartCtx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Followers (in Millions)',
+                    data: data,
+                    backgroundColor: '#FB923C',
+                    borderColor: '#F97316',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+       },
+                    tooltip: {
+                        backgroundColor: '#1C1917',
+                        titleFont: { size: 14, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        padding: 12,
+                        cornerRadius: 6,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.x !== null) {
+                                    label += context.parsed.x + 'M';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Followers (Millions)',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            color: '#44403C'
+                        },
+                        grid: {
+                            color: '#E7E5E4'
+                        }
+                    },
+                    y: {
+                         grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('animated-section-in-view');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.animated-section').forEach(section => {
+        observer.observe(section);
+    });
+
+    const elementObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const elements = entry.target.querySelectorAll('.animated-element');
+                elements.forEach(el => {
+                    el.classList.add('animated-element-in-view');
+                });
+                elementObserver.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.animated-section').forEach(section => {
+        elementObserver.observe(section);
+    });
+    
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href');
+            const targetElement = document.querySelector(targetId);
+            if (targetElement) {
+                const headerOffset = 80;
+                const elementPosition = targetElement.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: "smooth"
+                });
+            }
+        });
+    });
+
+    briefForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        briefOutput.classList.remove('hidden');
+        briefContent.textContent = '';
+        briefTitle.classList.add('hidden');
+        briefLoading.classList.remove('hidden');
+
+        const brandName = document.getElementById('brand-name').value;
+        const product = document.getElementById('product').value;
+        const targetAudience = document.getElementById('target-audience').value;
+        const campaignGoal = document.getElementById('campaign-goal').value;
+
+        const prompt = `You are a marketing strategist for Branqly. Generate a detailed influencer campaign brief. The brand name is "${brandName}". The product/service is "${product}". The target audience is "${targetAudience}". The campaign goal is "${campaignGoal}". The brief should include sections for Campaign Objectives, Target Influencer Profile, Key Messaging, Content Deliverables, and a Call to Action. Use a professional and encouraging tone.`;
+
+        try {
+            const result = await makeGeminiApiCall(prompt);
+            briefContent.textContent = result;
+            briefTitle.classList.remove('hidden');
+        } catch (error) {
+            briefContent.textContent = "Error generating brief. Please try again.";
+        } finally {
+            briefLoading.classList.add('hidden');
+        }
+    });
+
+    pitchForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        pitchOutput.classList.remove('hidden');
+        pitchContent.textContent = '';
+        pitchLoading.classList.remove('hidden');
+
+        const brandName = document.getElementById('pitch-brand-name').value;
+        const product = document.getElementById('pitch-product').value;
+
+        const prompt = `You are a professional brand representative. Write a concise and compelling influencer outreach email to ${currentInfluencerName}. The brand is "${brandName}" and we are interested in promoting our product/service: "${product}". The pitch should be respectful, highlight why their specific content style is a great fit, and propose a collaboration. Keep the tone friendly and professional.`;
+        
+        try {
+            const result = await makeGeminiApiCall(prompt);
+            pitchContent.textContent = result;
+        } catch (error) {
+            pitchContent.textContent = "Error generating pitch. Please try again.";
+        } finally {
+            pitchLoading.classList.add('hidden');
+        }
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+        pitchModal.style.display = 'none';
+        document.body.classList.remove('overflow-hidden');
+    });
+
+    window.addEventListener('click', (e) => {
+        if (e.target === pitchModal) {
+            pitchModal.style.display = 'none';
+            document.body.classList.remove('overflow-hidden');
+        }
+    });
+
+    function init() {
+        currentNiche = 'Fashion & Lifestyle';
+        renderFilters();
+        renderInfluencers();
+        updateChart();
+    }
+
+    init();
+});
+</script>
+</body>
+</html>
+
+
